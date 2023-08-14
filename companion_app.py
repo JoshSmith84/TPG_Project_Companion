@@ -96,6 +96,10 @@ class AppPage(ttk.Frame):
             'MDR': tk.StringVar(),
             'Ninjio': tk.StringVar(),
             'Barracuda': tk.StringVar(),
+            'AV-conv': tk.StringVar(),
+            'MDR-conv': tk.StringVar(),
+            'Ninjio-conv': tk.StringVar(),
+            'Barracuda-conv': tk.StringVar(),
         }
 
     def _add_frame(self, label, cols=2):
@@ -118,7 +122,7 @@ class AppPage(ttk.Frame):
                 raise ValueError(message)
         return data
 
-    def _tpg_tools(self, p_type, column):
+    def _tpg_tools(self, p_type, av, mdr, barracuda, ninjio):
         """Lays out the frames needed to select TPG tools.
         This is needed for onbaordings(to see what to deploy)
         Offboardings(to see what to pull)
@@ -129,45 +133,60 @@ class AppPage(ttk.Frame):
             mdr_info = self._add_frame(f"Which MDR are we pulling?")
             ess_info = self._add_frame(
                 f"Which Barracuda level are we pulling?")
+            ninjio_info = self._add_frame(
+                "Do they currently get Security Training?"
+            )
         elif p_type == 'Conversion':
             av_info = self._add_frame(f"Which AV do they currently have?")
             mdr_info = self._add_frame(f"Which MDR do they currently have?")
             ess_info = self._add_frame(
                 f"Which Barracuda level do they currently have?")
+            ninjio_info = self._add_frame(
+                "Do they currently get Security Training?"
+            )
         else:
             av_info = self._add_frame(f"Which AV are they getting?")
             mdr_info = self._add_frame(f"Which MDR are they getting?")
             ess_info = self._add_frame(
                 f"Which Barracuda level are they getting?")
+            ninjio_info = self._add_frame(
+                "Are they getting Security Training?"
+            )
 
         LabelInput(
             av_info, "", input_class=ttk.Radiobutton,
-            var=self._vars['AV'],
+            var=self._vars[av],
             input_args={"values": ['Sophos', 'AV Defender', 'None']}
-        ).grid(row=0, column=column)
+        ).grid(row=0, column=0)
 
         LabelInput(
             mdr_info, "", input_class=ttk.Radiobutton,
-            var=self._vars['MDR'],
+            var=self._vars[mdr],
             input_args={"values": ['Blackpoint', 'Arctic Wolf', 'None']}
-        ).grid(row=0, column=column)
+        ).grid(row=0, column=0)
 
         LabelInput(
             ess_info, "", input_class=ttk.Radiobutton,
-            var=self._vars['Barracuda'],
+            var=self._vars[barracuda],
             input_args={"values": ['Complete+Sentinel',
                                    'Complete Only',
                                    'Spam only',
                                    'None'
                                    ]
                         }
-        ).grid(row=0, column=column)
+        ).grid(row=0, column=0)
 
-        ninjio_info = self._add_frame("Security Training?")
         LabelInput(
-            ninjio_info, "Ninjio?", input_class=ttk.Checkbutton,
-            var=self._vars['Ninjio'],
-        ).grid(row=0, column=column)
+            ninjio_info, "Ninjio", input_class=ttk.Checkbutton,
+            var=self._vars[ninjio],
+        ).grid(row=0, column=0)
+
+    def create_title(self, client, p_type):
+        client_label = ttk.Label(
+            self,
+            text=f"{client}'s {p_type}",
+            font=("TKDefaultFont", 12))
+        client_label.grid(row=0)
 
 
     @staticmethod
@@ -283,13 +302,9 @@ class CreatePage2On(AppPage):
     def __init__(self, client, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.client_label = ttk.Label(
-            self,
-            text=f"{client}'s Onboarding",
-            font=("TKDefaultFont", 12))
-        self.client_label.grid(row=0)
+        self.create_title(client, 'Onboarding')
 
-        self._tpg_tools('Onboarding', 0)
+        self._tpg_tools('Onboarding', 'AV', 'MDR', 'Barracuda', 'Ninjio')
 
         buttons = tk.Frame(self)
         buttons.grid(sticky=tk.W + tk.E + tk.S, row=5)
@@ -313,13 +328,9 @@ class CreatePage2Off(AppPage):
     def __init__(self, client, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.client_label = ttk.Label(
-            self,
-            text=f"{client}'s Offboarding",
-            font=("TKDefaultFont", 12))
-        self.client_label.grid(row=0)
+        self.create_title(client, 'Offboarding')
 
-        self._tpg_tools('Offboarding', 0)
+        self._tpg_tools('Offboarding', 'AV', 'MDR', 'Barracuda', 'Ninjio')
 
         buttons = tk.Frame(self)
         buttons.grid(sticky=tk.W + tk.E + tk.S, row=5)
@@ -339,9 +350,42 @@ class CreatePage2Off(AppPage):
 class CreatePage2Conv(AppPage):
     """Creation Page 2 if 'Conversions' is type"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, client, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.create_title(client, 'Conversion')
+        self.old_label = ttk.Label(
+            self,
+            text="Old Plan Tools",
+            font=("TKDefaultFont", 11))
+        self.old_label.grid(row=1)
+        self._tpg_tools('Conversion', 'AV', 'MDR', 'Barracuda', 'Ninjio')
+        self.old_label = ttk.Label(
+            self,
+            text="New Plan Tools",
+            font=("TKDefaultFont", 11))
+        self.old_label.grid(row=6)
+        self._tpg_tools('Onboarding',
+                        'AV-conv',
+                        'MDR-conv',
+                        'Barracuda-conv',
+                        'Ninjio-conv',
+                        )
+
+        buttons = tk.Frame(self)
+        buttons.grid(sticky=tk.W + tk.E + tk.S, row=99)
+
+        self.quit_button = ttk.Button(
+            buttons, text="Quit", command=self._on_quit
+        )
+        self.quit_button.pack(side=tk.RIGHT)
+        self.next_button = ttk.Button(
+            buttons, text="Save", command=self._on_createconv_save
+        )
+        self.next_button.pack(side=tk.RIGHT)
+
+    def _on_createconv_save(self):
+        pass
 
 class Application(tk.Tk):
     """Application root window"""
@@ -357,6 +401,7 @@ class Application(tk.Tk):
         self.c_page1 = CreatePage1(self)
         self.c_page2_on = CreatePage2On(self)
         self.c_page2_off = CreatePage2Off(self)
+        self.c_page2_conv = CreatePage2Conv(self)
         self.client_data = {}
         self.new_plan_data = {}
 
@@ -403,7 +448,8 @@ class Application(tk.Tk):
             self.c_page2_off = CreatePage2Off(client_name)
             self.c_page2_off.grid(row=1, padx=10, sticky=(tk.W + tk. E))
         elif self.client_data['Type'] == 'Conversion':
-            print('open Conversion page')
+            self.c_page2_conv = CreatePage2Conv(client_name)
+            self.c_page2_conv.grid(row=1, padx=10, sticky=(tk.W + tk.E))
         else:
             self.status.set('Required Project Type is Missing!')
 

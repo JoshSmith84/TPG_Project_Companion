@@ -1,4 +1,4 @@
-#companion_app.py
+# companion_app.py
 # Author:Josh Smith
 
 import sys
@@ -99,7 +99,8 @@ class AppPage(ttk.Frame):
         }
 
     def _add_frame(self, label, cols=2):
-        """Add a label frame to the form"""
+        """Add a label frame to the form
+        Credit: Alan D. Moore "Python GUI Programming with Tkinter"""
 
         frame = ttk.LabelFrame(self, text=label)
         frame.grid(sticky=tk.W + tk.E)

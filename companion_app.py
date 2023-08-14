@@ -1,4 +1,6 @@
 #companion_app.py
+# Author:Josh Smith
+
 import sys
 from pathlib import Path
 import csv

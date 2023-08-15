@@ -2,10 +2,13 @@
 # Author:Josh Smith
 
 import sys
-from pathlib import Path
-import csv
 import tkinter as tk
 from tkinter import ttk
+from tkcalendar import Calendar
+from tkcalendar import DateEntry
+from pathlib import Path
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 
 
 class BoundText(tk.Text):
@@ -251,15 +254,19 @@ class CreatePage1(AppPage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+
         c_info = self._add_frame("Client Information")
 
         LabelInput(
             c_info, "Client Name", var=self._vars['Client Name']
         ).grid(row=0, column=0)
-        LabelInput(
-            c_info, "Go Live / Dead Date",
-            var=self._vars['Go Live / Dead Date']
-        ).grid(row=1, column=0)
+        self.cal = Calendar(c_info, selectmode='day', year=2023)
+        self.cal.grid(row=2, column=0)
+        self.date_label = tk.Label(
+            c_info,
+            text='Choose Go Live / Dead Date',
+        )
+        self.date_label.grid(row=1, column=0)
 
         m_info = self._add_frame('Market')
 
@@ -292,6 +299,7 @@ class CreatePage1(AppPage):
     def _on_create2(self):
         """Move onto creation page two
         (which will be one of three pages depending on Type selected"""
+        self._vars['Go Live / Dead Date'].set(self.cal.get_date())
         app.create_page2()
 
 
@@ -345,7 +353,8 @@ class CreatePage2Off(AppPage):
         self.next_button.pack(side=tk.RIGHT)
 
     def _on_createoff_save(self):
-        pass
+        app.creation_off_complete()
+
 
 class CreatePage2Conv(AppPage):
     """Creation Page 2 if 'Conversions' is type"""
@@ -385,7 +394,8 @@ class CreatePage2Conv(AppPage):
         self.next_button.pack(side=tk.RIGHT)
 
     def _on_createconv_save(self):
-        pass
+        app.creation_conv_complete()
+
 
 class Application(tk.Tk):
     """Application root window"""
@@ -403,12 +413,35 @@ class Application(tk.Tk):
         self.c_page2_off = CreatePage2Off(self)
         self.c_page2_conv = CreatePage2Conv(self)
         self.client_data = {}
-        self.new_plan_data = {}
+        self.plan_data = {}
 
         self.status = tk.StringVar()
         ttk.Label(self, textvariable=self.status
                   ).grid(sticky=(tk.W + tk.E), row=2, padx=10)
         self.main_page()
+        self.db_file = 'ProjectCompanion-DBv1.xlsx'
+
+    def client_check(self, wb_sheet, client):
+        """
+        Pass the needed sheet name and device name.
+        Iterate through the sheet and look for the existence of the client name.
+        If the client is present, return the row it resides in,
+        if the client is not present return empty value for device.
+        Needed modules: openpyxl, Workbook
+        :param wb_sheet: The sheet to check
+        :param client: The client name to search for
+        :return: The row number the device resides in.
+        """
+        max_row = wb_sheet.max_row
+        client_row = ''
+        for i in range(1, max_row + 1):
+            cell_data = wb_sheet.cell(row=i, column=1).value
+            if client in cell_data:
+                client_row = i
+                break
+            else:
+                client_row = ''
+        return client_row
 
     def main_page(self):
         self.m_page = MainPage(self)
@@ -426,6 +459,7 @@ class Application(tk.Tk):
         self.m_page.destroy()
         self.c_page1 = CreatePage1(self)
         self.c_page1.grid(row=1, padx=10, sticky=(tk.W + tk.E))
+        self.status.set(str(''))
 
     def create_page2(self):
         try:
@@ -453,18 +487,79 @@ class Application(tk.Tk):
         else:
             self.status.set('Required Project Type is Missing!')
 
+    def project_creation(self, p_type):
+        """Method used by all create project pages to write new project to db"""
+        wb = load_workbook(self.db_file)
+        sheet = wb['Sheet1']
+        client_row = self.client_check(sheet, self.client_data['Client Name'])
+        if client_row == '':
+            client_row = sheet.max_row + 1
+            if p_type == 'Conversion':
+                new_row = [(self.client_data['Client Name'],
+                            self.client_data['Go Live / Dead Date'],
+                            self.client_data['Market'],
+                            self.client_data['Type'],
+                            self.plan_data['AV'],
+                            self.plan_data['MDR'],
+                            self.plan_data['Ninjio'],
+                            self.plan_data['Barracuda'],
+                            self.plan_data['AV-conv'],
+                            self.plan_data['MDR-conv'],
+                            self.plan_data['Ninjio-conv'],
+                            self.plan_data['Barracuda-conv'],
+                            )]
+            else:
+                new_row = [(self.client_data['Client Name'],
+                            self.client_data['Go Live / Dead Date'],
+                            self.client_data['Market'],
+                            self.client_data['Type'],
+                            self.plan_data['AV'],
+                            self.plan_data['MDR'],
+                            self.plan_data['Ninjio'],
+                            self.plan_data['Barracuda'],
+                            )]
+            for row in new_row:
+                sheet.append(row)
+        else:
+            self.status.set(str(f"A project already exists for "
+                                f"{self.client_data['Client Name']}! "
+                                f"Data not saved!"))
+        wb.save(self.db_file)
+        self.status.set(str(f"A project has been created for "
+                            f"{self.client_data['Client Name']}"))
+
     def creation_on_complete(self):
         try:
-            self.new_plan_data = self.c_page2_on.get()
+            self.plan_data = self.c_page2_on.get()
         except ValueError as e:
             self.status.set(str(e))
             return
-        print(self.client_data)
-        print(self.new_plan_data)
         self.c_page2_on.grid_forget()
         self.c_page2_on.destroy()
         self.main_page()
+        self.project_creation('Onboarding')
 
+    def creation_off_complete(self):
+        try:
+            self.plan_data = self.c_page2_off.get()
+        except ValueError as e:
+            self.status.set(str(e))
+            return
+        self.c_page2_off.grid_forget()
+        self.c_page2_off.destroy()
+        self.main_page()
+        self.project_creation('Offboarding')
+
+    def creation_conv_complete(self):
+        try:
+            self.plan_data = self.c_page2_conv.get()
+        except ValueError as e:
+            self.status.set(str(e))
+            return
+        self.c_page2_conv.grid_forget()
+        self.c_page2_conv.destroy()
+        self.main_page()
+        self.project_creation('Conversion')
 
 if __name__ == "__main__":
     app = Application()

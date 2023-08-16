@@ -327,7 +327,7 @@ class CreatePage2On(AppPage):
         self.next_button.pack(side=tk.RIGHT)
 
     def _on_create2on_save(self):
-        app.creation_on_complete()
+        app.creation_complete()
 
 
 class CreatePage2Off(AppPage):
@@ -353,7 +353,7 @@ class CreatePage2Off(AppPage):
         self.next_button.pack(side=tk.RIGHT)
 
     def _on_createoff_save(self):
-        app.creation_off_complete()
+        app.creation_complete()
 
 
 class CreatePage2Conv(AppPage):
@@ -394,7 +394,7 @@ class CreatePage2Conv(AppPage):
         self.next_button.pack(side=tk.RIGHT)
 
     def _on_createconv_save(self):
-        app.creation_conv_complete()
+        app.creation_complete()
 
 
 class Application(tk.Tk):
@@ -487,37 +487,28 @@ class Application(tk.Tk):
         else:
             self.status.set('Required Project Type is Missing!')
 
-    def project_creation(self, p_type):
+    def project_creation(self):
         """Method used by all create project pages to write new project to db"""
         wb = load_workbook(self.db_file)
         sheet = wb['Sheet1']
         client_row = self.client_check(sheet, self.client_data['Client Name'])
         if client_row == '':
             client_row = sheet.max_row + 1
-            if p_type == 'Conversion':
-                new_row = [(self.client_data['Client Name'],
-                            self.client_data['Go Live / Dead Date'],
-                            self.client_data['Market'],
-                            self.client_data['Type'],
-                            self.plan_data['AV'],
-                            self.plan_data['MDR'],
-                            self.plan_data['Ninjio'],
-                            self.plan_data['Barracuda'],
-                            self.plan_data['AV-conv'],
-                            self.plan_data['MDR-conv'],
-                            self.plan_data['Ninjio-conv'],
-                            self.plan_data['Barracuda-conv'],
-                            )]
-            else:
-                new_row = [(self.client_data['Client Name'],
-                            self.client_data['Go Live / Dead Date'],
-                            self.client_data['Market'],
-                            self.client_data['Type'],
-                            self.plan_data['AV'],
-                            self.plan_data['MDR'],
-                            self.plan_data['Ninjio'],
-                            self.plan_data['Barracuda'],
-                            )]
+
+            new_row = [(self.client_data['Client Name'],
+                        self.client_data['Go Live / Dead Date'],
+                        self.client_data['Market'],
+                        self.client_data['Type'],
+                        self.plan_data['AV'],
+                        self.plan_data['MDR'],
+                        self.plan_data['Ninjio'],
+                        self.plan_data['Barracuda'],
+                        self.plan_data['AV-conv'],
+                        self.plan_data['MDR-conv'],
+                        self.plan_data['Ninjio-conv'],
+                        self.plan_data['Barracuda-conv'],
+                        )]
+
             for row in new_row:
                 sheet.append(row)
         else:
@@ -528,38 +519,25 @@ class Application(tk.Tk):
         self.status.set(str(f"A project has been created for "
                             f"{self.client_data['Client Name']}"))
 
-    def creation_on_complete(self):
+    def creation_complete(self):
         try:
-            self.plan_data = self.c_page2_on.get()
-        except ValueError as e:
-            self.status.set(str(e))
+            for i in (self.c_page2_on, self.c_page2_off, self.c_page2_conv):
+                current_frame = ''
+                if i.winfo_exists():
+                    current_frame = i
+                    break
+        except AttributeError:
             return
-        self.c_page2_on.grid_forget()
-        self.c_page2_on.destroy()
-        self.main_page()
-        self.project_creation('Onboarding')
 
-    def creation_off_complete(self):
         try:
-            self.plan_data = self.c_page2_off.get()
+            self.plan_data = current_frame.get()
         except ValueError as e:
             self.status.set(str(e))
             return
-        self.c_page2_off.grid_forget()
-        self.c_page2_off.destroy()
+        current_frame.grid_forget()
+        current_frame.destroy()
         self.main_page()
-        self.project_creation('Offboarding')
-
-    def creation_conv_complete(self):
-        try:
-            self.plan_data = self.c_page2_conv.get()
-        except ValueError as e:
-            self.status.set(str(e))
-            return
-        self.c_page2_conv.grid_forget()
-        self.c_page2_conv.destroy()
-        self.main_page()
-        self.project_creation('Conversion')
+        self.project_creation()
 
 if __name__ == "__main__":
     app = Application()

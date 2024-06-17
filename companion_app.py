@@ -48,7 +48,7 @@ class LabelInput(tk.Frame):
         label_args = label_args or {}
         # The above statements say if label_args or input_args are not None,
         # they are what was passed during init.
-        # However if they are None, then make them empty dicts
+        # However, if they are None, then make them empty dicts
         self.variable = var
         self.variable.label_widget = self
 
@@ -103,6 +103,7 @@ class AppPage(ttk.Frame):
             'MDR-conv': tk.StringVar(),
             'Ninjio-conv': tk.StringVar(),
             'Barracuda-conv': tk.StringVar(),
+            'update1_choice': tk.StringVar(),
         }
 
     def _add_frame(self, label, cols=2):
@@ -240,7 +241,7 @@ class MainPage(AppPage):
 
     def _on_update(self):
         """Command to update existing project"""
-        pass
+        app.update_page1()
 
     def _on_report(self):
         """Command to open report page"""
@@ -273,7 +274,9 @@ class CreatePage1(AppPage):
         LabelInput(
             m_info, "", input_class=ttk.Radiobutton,
             var=self._vars['Market'],
-            input_args={"values": ["NO", "SHV", "ATX", "IND", "VAL", "KC"]},
+            input_args={"values": ["NO", "SHV", "ATX",
+                                   "IND", "VAL", "KC",
+                                   "DFW", "HOU"]},
         ).grid(row=0, column=0)
 
         t_info = self._add_frame('Project Type')
@@ -397,6 +400,70 @@ class CreatePage2Conv(AppPage):
         app.creation_complete()
 
 
+class UpdatePage1(AppPage):
+    """Page 1 of update section to choose client"""
+
+    def __init__(self, client_lists, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        tk.Label(self, text='Choose Client Project to update'
+                 ).grid(row=0, column=0, sticky=(tk.W + tk.E))
+        self.client_choice = []
+        for i in client_lists:
+            if i[0] == 'Client Name':
+                continue
+            else:
+                client_proj = f'{i[2]} - {i[0]} - {i[3]}'
+                self.client_choice.append(client_proj)
+        self.client_choice = sorted(self.client_choice)
+        self.max_len = 0
+        # expand width by longest client name in list
+        for i in self.client_choice:
+            if len(i) > self.max_len:
+                self.max_len = len(i)
+        self.client_box = tk.Listbox(self, height=20, width=self.max_len)
+        self.client_box.grid(row=1, column=0)
+        self.client_box.delete(0, 'end')
+        for i in self.client_choice:
+            self.client_box.insert('end', i)
+
+        buttons = tk.Frame(self)
+        buttons.grid(sticky=tk.W + tk.E + tk.S, row=99)
+
+        self.quit_button = ttk.Button(
+            buttons, text="Quit", command=self._on_quit
+        )
+        self.quit_button.pack(side=tk.RIGHT)
+        self.next_button = ttk.Button(
+            buttons, text="Next", command=self._on_update1_next
+        )
+        self.next_button.pack(side=tk.RIGHT)
+
+    def _on_update1_next(self):
+        choice = ''
+        for i in self.client_box.curselection():
+             choice = self.client_box.get(i)
+        self._vars['update1_choice'] = tk.StringVar(value=choice)
+        app.update_page2()
+
+
+class UpdatePage2(AppPage):
+    """Page 2 of the update page. Different layout depending on project type"""
+
+    def __init__(self, client_proj_list, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.create_title(client_proj_list[0], client_proj_list[3])
+        self.task_frame = tk.Frame()
+        # if client_proj_list[3] == 'Onboarding':
+            # LabelInput(
+            #     ninjio_info, "Ninjio", input_class=ttk.Checkbutton,
+            #     var=self._vars[ninjio],
+            # ).grid(row=0, column=0)
+            #
+
+
+
+
 class Application(tk.Tk):
     """Application root window"""
 
@@ -414,12 +481,18 @@ class Application(tk.Tk):
         self.c_page2_conv = CreatePage2Conv(self)
         self.client_data = {}
         self.plan_data = {}
+        self.client_projects = []
+        self.u_page1 = UpdatePage1(self.client_projects)
+        self.update1_choice_client = ''
+        self.u_page2 = UpdatePage2('Failed to pull client data', 'Try again')
+
 
         self.status = tk.StringVar()
         ttk.Label(self, textvariable=self.status
                   ).grid(sticky=(tk.W + tk.E), row=2, padx=10)
         self.main_page()
         self.db_file = 'ProjectCompanion-DBv1.xlsx'
+        self.update1_choice = ''
 
     def client_check(self, wb_sheet, client):
         """
@@ -538,6 +611,49 @@ class Application(tk.Tk):
         current_frame.destroy()
         self.main_page()
         self.project_creation()
+
+
+    def pull_dbv1(self, wb, sheet):
+        wb = load_workbook(wb)
+        sheet = wb[sheet]
+        proj_list = []
+        for row in sheet.rows:
+            temp_list = []
+            for item in row:
+                temp_list.append(item.value)
+            proj_list.append(temp_list)
+        wb.close()
+        return proj_list
+
+
+    def update_page1(self):
+        self.main_label.grid_forget()
+        self.main_label.destroy()
+        self.m_page.grid_forget()
+        self.m_page.destroy()
+        self.client_projects = self.pull_dbv1(self.db_file, 'Sheet1')
+        self.u_page1 = UpdatePage1(self.client_projects)
+        self.u_page1.grid(row=1, padx=10, sticky=(tk.W + tk. E))
+
+    def update_page2(self):
+        try:
+            self.update1_choice = self.u_page1.get()
+        except ValueError as e:
+            self.status.set(str(e))
+            return
+        self.update1_choice_list = \
+            self.update1_choice['update1_choice'].split(' - ')
+        self.update1_choice_client = self.update1_choice_list[1]
+        proj_list = self.pull_dbv1(self.db_file, 'Sheet1')
+        for i in proj_list:
+            if i[0] == self.update1_choice_client:
+                client_proj_data = i
+        print(client_proj_data)
+        self.u_page1.grid_forget()
+        self.u_page1.destroy()
+        self.u_page2 = UpdatePage2(client_proj_data)
+
+
 
 if __name__ == "__main__":
     app = Application()
